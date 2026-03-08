@@ -1,0 +1,48 @@
+{
+  "name": "@redwoodjs/starter",
+  "version": "1.0.0",
+  "description": "A bare-bones RedwoodSDK starter",
+  "main": "index.js",
+  "type": "module",
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite dev",
+    "dev:init": "rw-scripts dev-init",
+    "preview": "vite preview",
+    "worker:run": "rw-scripts worker-run",
+    "clean": "npm run clean:vite",
+    "clean:vite": "rm -rf ./node_modules/.vite",
+    "release": "rw-scripts ensure-deploy-env && npm run clean && npm run build && wrangler deploy",
+    "generate": "rw-scripts ensure-env && wrangler types --include-runtime false",
+    "check": "npm run generate && npm run types",
+    "types": "tsc"
+  },
+  "dependencies": {
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-server-dom-webpack": "19.2.4",
+    "rwsdk": "1.0.0-beta.56"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.26.0",
+    "@cloudflare/workers-types": "4.20260305.1",
+    "@types/node": "~25.3.3",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "typescript": "5.9.3",
+    "vite": "7.3.1",
+    "wrangler": "4.70.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "workerd"
+    ]
+  },
+  "packageManager": "pnpm@10.31.0"
+}
