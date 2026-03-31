@@ -11,6 +11,8 @@ const SLIDE_TYPES: { type: SlideDefinition["type"]; label: string; emoji: string
   { type: "word-cloud", label: "Word Cloud", emoji: "☁️", desc: "One-word responses" },
   { type: "rating", label: "Rating", emoji: "⭐", desc: "Rate 1 to 5 stars" },
   { type: "open-text", label: "Open Text", emoji: "💬", desc: "Free-form answers" },
+  { type: "quiz", label: "Quiz", emoji: "🧠", desc: "Timed quiz with scoring" },
+  { type: "qa", label: "Q&A", emoji: "🙋", desc: "Live audience questions" },
 ];
 
 function defaultSlide(): SlideDefinition {
@@ -36,6 +38,12 @@ export function HomePage() {
     if (slides.some((s) => !s.question.trim())) { setError("All slides need a question."); return; }
     if (slides.some((s) => s.type === "multiple-choice" && (!s.options || s.options.filter(Boolean).length < 2))) {
       setError("Multiple choice slides need at least 2 options."); return;
+    }
+    if (slides.some((s) => s.type === "quiz" && (!s.options || s.options.filter(Boolean).length < 2))) {
+      setError("Quiz slides need at least 2 options."); return;
+    }
+    if (slides.some((s) => s.type === "quiz" && (s.correctAnswer == null || !s.timerSeconds))) {
+      setError("Quiz slides need a correct answer and timer duration."); return;
     }
     setLoading(true);
     try {
@@ -78,18 +86,25 @@ export function HomePage() {
 
   function updateSlide(idx: number, patch: Partial<SlideDefinition>) {
     setSlides((prev) =>
-      prev.map((s, i) =>
-        i === idx
-          ? {
-            ...s,
-            ...patch,
-            options:
-              patch.type && patch.type !== s.type
-                ? patch.type === "multiple-choice" ? ["", ""] : undefined
-                : patch.options ?? s.options,
-          }
-          : s
-      )
+      prev.map((s, i) => {
+        if (i !== idx) return s;
+        const typeChanged = patch.type && patch.type !== s.type;
+        const newType = patch.type ?? s.type;
+        const needsOptions = newType === "multiple-choice" || newType === "quiz";
+        return {
+          ...s,
+          ...patch,
+          options: typeChanged
+            ? (needsOptions ? ["", ""] : undefined)
+            : (patch.options ?? s.options),
+          correctAnswer: typeChanged
+            ? (newType === "quiz" ? 0 : undefined)
+            : (patch.correctAnswer ?? s.correctAnswer),
+          timerSeconds: typeChanged
+            ? (newType === "quiz" ? 20 : undefined)
+            : (patch.timerSeconds ?? s.timerSeconds),
+        };
+      })
     );
   }
 
@@ -119,7 +134,7 @@ export function HomePage() {
     return (
       <div className="page">
         <nav className="navbar">
-          <span className="navbar-brand">⚡ LiveSpark</span>
+          <a href="/" className="navbar-brand" onClick={(e) => { e.preventDefault(); setMode("landing"); }}>⚡ LiveSpark</a>
           <button className="btn btn--ghost btn--sm" onClick={() => setMode("landing")}>← Back</button>
         </nav>
         <div className="container--narrow" style={{ paddingTop: "80px" }}>
@@ -151,7 +166,7 @@ export function HomePage() {
     return (
       <div className="page">
         <nav className="navbar">
-          <span className="navbar-brand">⚡ LiveSpark</span>
+          <a href="/" className="navbar-brand" onClick={(e) => { e.preventDefault(); setMode("landing"); }}>⚡ LiveSpark</a>
           <div className="flex gap-3 items-center">
             <button className="btn btn--ghost btn--sm" onClick={() => setMode("landing")}>← Back</button>
             <button className="btn btn--primary" onClick={handleCreate} disabled={loading}>
@@ -206,15 +221,26 @@ export function HomePage() {
                   />
                 </div>
 
-                {slide.type === "multiple-choice" && (
+                {(slide.type === "multiple-choice" || slide.type === "quiz") && (
                   <div className="flex-col gap-2">
                     {(slide.options || []).map((opt, optIdx) => (
                       <div key={optIdx} className="flex gap-2 items-center">
+                        {slide.type === "quiz" && (
+                          <input
+                            type="radio"
+                            name={`correct-${slide.id}`}
+                            checked={slide.correctAnswer === optIdx}
+                            onChange={() => updateSlide(idx, { correctAnswer: optIdx })}
+                            title="Mark as correct answer"
+                            style={{ accentColor: "var(--color-success)" }}
+                          />
+                        )}
                         <input
                           className="input"
                           placeholder={`Option ${optIdx + 1}`}
                           value={opt}
                           onChange={(e) => updateOption(idx, optIdx, e.target.value)}
+                          style={slide.type === "quiz" && slide.correctAnswer === optIdx ? { borderColor: "var(--color-success)" } : {}}
                         />
                         {(slide.options || []).length > 2 && (
                           <button className="btn btn--ghost btn--sm" onClick={() => removeOption(idx, optIdx)}>✕</button>
@@ -224,6 +250,26 @@ export function HomePage() {
                     <button className="btn btn--ghost btn--sm" style={{ width: "max-content" }} onClick={() => addOption(idx)}>
                       + Add Option
                     </button>
+                    {slide.type === "quiz" && (
+                      <div className="flex gap-3 items-center" style={{ marginTop: "8px" }}>
+                        <label className="text-secondary" style={{ fontSize: "0.82rem", whiteSpace: "nowrap" }}>Timer:</label>
+                        <select
+                          className="select"
+                          style={{ width: "auto", padding: "4px 8px", fontSize: "0.82rem" }}
+                          value={slide.timerSeconds ?? 20}
+                          onChange={(e) => updateSlide(idx, { timerSeconds: Number(e.target.value) })}
+                        >
+                          <option value={10}>10 seconds</option>
+                          <option value={20}>20 seconds</option>
+                          <option value={30}>30 seconds</option>
+                          <option value={45}>45 seconds</option>
+                          <option value={60}>60 seconds</option>
+                        </select>
+                        <span className="text-muted" style={{ fontSize: "0.78rem" }}>
+                          Correct: Option {String.fromCharCode(65 + (slide.correctAnswer ?? 0))}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -248,7 +294,7 @@ export function HomePage() {
   return (
     <div className="page">
       <nav className="navbar">
-        <span className="navbar-brand">⚡ LiveSpark</span>
+        <a href="/" className="navbar-brand">⚡ LiveSpark</a>
         <span className="badge badge--primary">Beta</span>
       </nav>
       <div className="container hero">
@@ -275,6 +321,16 @@ export function HomePage() {
           ))}
         </div>
       </div>
+      <footer className="footer">
+        <p>
+          Made with{" "}
+          <a href="https://claude.ai/code" target="_blank" rel="noopener noreferrer">Claude Code</a>
+          {" "}by Yash Oswal
+        </p>
+        <a href="https://github.com/side-projects-overkill/livespark" target="_blank" rel="noopener noreferrer" className="footer-github">
+          GitHub
+        </a>
+      </footer>
     </div>
   );
 }
